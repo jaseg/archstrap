@@ -1,0 +1,9 @@
+---
+- hosts: nosuchlink-setup
+  roles:
+    - install_outer
+
+- hosts: nosuchlink-setup-chroot
+  roles:
+    - install_inner
+

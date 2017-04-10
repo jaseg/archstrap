@@ -1,0 +1,9 @@
+[Match]
+Name=eth0
+
+[Network]
+{# This is shit. #}
+{% set net_mask = ansible_default_ipv4.network+"/"+ansible_default_ipv4.netmask %}
+Address={{ansible_default_ipv4.address}}/{{net_mask|ipaddr('prefix')}}
+Gateway={{ansible_default_ipv4.gateway}}
+

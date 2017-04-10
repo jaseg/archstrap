@@ -1,0 +1,180 @@
+---
+- name: Add chroot ssh rule
+  blockinfile:
+    path: /etc/ssh/sshd_config
+    block: |
+      Port 22
+      Port 2222
+      Match LocalPort 2222
+          ChrootDirectory /mnt
+          X11Forwarding no
+
+- name: Fix sftp for chroot operation
+  lineinfile:
+    path: /etc/ssh/sshd_config
+    regexp: '^Subsystem\s+sftp'
+    line: 'Subsystem sftp internal-sftp'
+
+- name: Fixup root shell for chroot
+  user:
+    name: root
+    shell: /bin/sh
+
+- name: Restart sshd
+  service:
+    name: sshd
+    state: restarted
+
+- name: Setup /boot partition
+  parted:
+    device: '{{install_device}}'
+    number: 1
+    state: present
+    part_end: 1GiB
+
+- name: Setup system root partition
+  parted:
+    device: '{{install_device}}'
+    number: 2
+    state: present
+    part_start: 1GiB
+    part_end: 100%
+  register: result
+
+- set_fact:
+    bootdev: '{{install_device}}1'
+    rootdev: '{{install_device}}2'
+
+- name: Try to open encrypted root volume
+  shell: 'echo -n foobar2342 | cryptsetup --key-file - luksOpen {{rootdev}} root'
+  args:
+    creates: /dev/mapper/root
+  register: cryptresult
+
+- name: Setup encrypted root volume
+  shell: 'echo -n foobar2342 | cryptsetup --key-file - luksFormat {{rootdev}}'
+  when: result|succeeded and cryptresult|failed
+
+- name: Open encrypted root volume
+  shell: 'echo -n foobar2342 | cryptsetup --key-file - luksOpen {{rootdev}} root'
+  args:
+    creates: /dev/mapper/root
+  when: cryptresult|succeeded
+
+- name: Mount root file system (late)
+  mount:
+    src: /dev/mapper/root
+    path: /mnt
+    state: mounted
+    fstype: ext4
+  register: rootmount
+
+- name: Create root file system
+  filesystem:
+    dev: /dev/mapper/root
+    force: yes
+    fstype: ext4
+  when: rootmount|failed
+
+- name: Mount root file system (late)
+  mount:
+    src: /dev/mapper/root
+    path: /mnt
+    state: mounted
+    fstype: ext4
+  when: rootmount|failed
+
+- name: Mount boot file system
+  mount:
+    src: '{{bootdev}}'
+    path: /mnt/boot
+    state: mounted
+    fstype: ext4
+  register: bootmount
+
+- name: Create boot file system
+  filesystem:
+    dev: '{{bootdev}}'
+    force: yes
+    fstype: ext4
+    opts: '-O ^64bit'
+  when: bootmount|failed
+
+- name: Mount boot file system (late)
+  mount:
+    src: '{{bootdev}}'
+    path: /mnt/boot
+    state: mounted
+    fstype: ext4
+  when: bootmount|failed
+
+- name: Run pacstrap
+  command: 'pacstrap /mnt base'
+  args:
+    creates: /mnt/etc/os-release
+#  register: result
+
+- name: Install packages
+  command: 'pacman -r /mnt -S --needed --noconfirm python2 openssh vim tmux fish htop'
+
+- name: Mount /proc in chroot
+  mount:
+    path: /mnt/proc
+    fstype: proc
+    opts: nosuid,noexec,nodev
+    state: mounted
+    src: proc
+
+- name: Mount /sys in chroot
+  mount:
+    path: /mnt/sys
+    fstype: sysfs
+    opts: nosuid,noexec,nodev,ro
+    state: mounted
+    src: sys
+
+- name: Mount /dev in chroot
+  mount:
+    path: /mnt/dev
+    fstype: devtmpfs
+    opts: mode=0755,nosuid
+    state: mounted
+    src: dev
+
+- name: Mount /dev/pts in chroot
+  mount:
+    path: /mnt/dev/pts
+    fstype: devpts
+    opts: mode=0620,gid=5,nosuid,noexec
+    state: mounted
+    src: devpts
+
+- name: Mount /dev/shm in chroot
+  mount:
+    path: /mnt/dev/shm
+    fstype: tmpfs
+    opts: mode=1777,nosuid,nodev
+    state: mounted
+    src: tmpfs
+
+- name: Mount /run in chroot
+  mount:
+    path: /mnt/run
+    fstype: tmpfs
+    opts: nosuid,nodev,mode=0755
+    state: mounted
+    src: run
+
+- name: Mount /tmp in chroot
+  mount:
+    path: /mnt/tmp
+    fstype: tmpfs
+    opts: mode=1777,strictatime,nodev,nosuid
+    state: mounted
+    src: tmpfs
+
+# Not neccessary, already done by pacstrap
+# - name: Generate fstab
+#   shell: 'genfstab -U /mnt >> /mnt/etc/fstab'
+#   when: result|succeeded
+

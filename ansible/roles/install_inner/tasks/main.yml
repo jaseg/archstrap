@@ -1,0 +1,120 @@
+---
+# Note: the timezone module does not work here
+- name: Setup temporary nameserver
+  lineinfile:
+    path: /etc/resolv.conf
+    regexp: '^nameserver\s'
+    line: 'nameserver {{nameserver}}'
+
+- name: Set timezone
+  file:
+    src: /usr/share/zoneinfo/Europe/Berlin
+    dest: /etc/localtime
+    state: link
+
+- name: Setup locales
+  locale_gen:
+    name: en_US.UTF-8
+    state: present
+
+- name: Install initcpio ssh mod
+  include: initcpio_ssh.yml
+  creates: /boot/vmlinuz
+
+- name: Copy initcpio ssh pubkey
+  copy:
+    src: '{{ssh_boot_key}}'
+    dest: /etc/dropbear/root_key
+    owner: root
+    group: root
+    mode: 0640
+
+- name: Create initcpio
+  command: mkinitcpio -p linux
+  args:
+    creates: /boot/vmlinuz
+
+- name: Install syslinux package
+  command: 'pacman -S --needed --noconfirm syslinux'
+
+- name: Install syslinux to disk
+  command: syslinux-install_update -i -a -m
+  args:
+    creates: /boot/syslinux
+
+- name: Get name of root device
+  shell: 'cryptsetup status root|grep device:|cut -d: -f2|xargs'
+  register: rootdev
+
+- set_fact:
+    cmdline: 'ip={{ansible_default_ipv4.address}}:::::eth0:none cryptdevice={{rootdev.stdout}}:root root=/dev/mapper/root rw'
+
+- name: Template syslinux config file
+  template:
+    src: files/syslinux.cfg.j2
+    dest: /boot/syslinux/syslinux.cfg
+    owner: root
+    group: root
+    mode: 0640
+
+- name: Create root ssh config dir
+  file:
+    path: /root/.ssh
+    state: directory
+    owner: root
+    group: root
+    mode: 0700
+
+- name: Copy ssh root key
+  copy:
+    src: '{{ssh_root_key}}'
+    dest: /root/.ssh/authorized_keys
+    owner: root
+    group: root
+    mode: 0600
+
+- name: Configure sshd PermitRootLogin
+  lineinfile: 
+    path: /etc/ssh/sshd_config
+    line: 'PermitRootLogin prohibit-password'
+    regexp: '^PermitRootLogin '
+
+- name: Configure sshd PasswordAuthentication
+  lineinfile: 
+    path: /etc/ssh/sshd_config
+    line: 'PasswordAuthentication no'
+    regexp: '^PasswordAuthentication '
+
+- name: Enable sshd
+  command: 'systemctl enable sshd.service'
+
+- name: Lock root password
+  command: 'passwd -l root'
+  
+- name: Create systemd networkd directory
+  file:
+    path: /etc/systemd/networkd
+    state: directory
+    owner: root
+    group: root
+    mode: 0755
+
+- name: Configure eth0
+  template: 
+    src: files/eth0_static.network.j2
+    dest: /etc/systemd/network/eth0_static.network
+    owner: root
+    group: root
+    mode: 0644
+
+- name: Configure nameserver
+  template: 
+    src: files/resolv.conf.j2
+    dest: /etc/resolv.conf
+    owner: root
+    group: root
+    mode: 0644
+
+- name: Enable systemd-networkd
+  command: 'systemctl enable systemd-networkd.service'
+

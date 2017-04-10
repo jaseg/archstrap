@@ -1,0 +1,45 @@
+---
+- name: Install dropbear
+  command: 'pacman -S --needed --noconfirm dropbear'
+
+- name: Install mkinitcpio-nfs-utils for /usr/lib/initcpio/ipconfig
+  command: 'pacman -S --needed --noconfirm mkinitcpio-nfs-utils'
+
+- name: Copy mkinitcpio hooks
+  copy:
+    src: files/hooks/
+    dest: /usr/lib/initcpio/hooks/
+    owner: root
+    group: root
+    mode: 0644
+
+- name: Copy mkinitcpio install scripts
+  copy:
+    src: files/install/
+    dest: /usr/lib/initcpio/install/
+    owner: root
+    group: root
+    mode: 0644
+
+- name: Make encryptssh /usr/share folder
+  file:
+    name: /usr/share/mkinitcpio-utils/utils/shells
+    state: directory
+    owner: root
+    group: root
+    mode: 0755
+
+- name: Copy mkinitcpio encryptssh shell
+  copy:
+    src: files/cryptsetup_shell
+    dest: /usr/share/mkinitcpio-utils/utils/shells/cryptsetup_shell
+    owner: root
+    group: root
+    mode: 0755
+
+- name: Fixup mkinitcpio.conf
+  lineinfile:
+    path: /etc/mkinitcpio.conf
+    line: 'HOOKS="base udev autodetect modconf block netconf dropbear keyboard encryptssh filesystems fsck"'
+    regexp: '^HOOKS='
+
