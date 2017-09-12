@@ -5,18 +5,23 @@ nosuchlink-setup
 nosuchlink-setup-chroot
 
 [setup:vars]
-ansible_host=10.137.2.16
+#ansible_host=10.137.2.16
+ansible_host=37.120.169.128
 ansible_ssh_user=root
-ansible_ssh_pass=foobar2342
+#ansible_ssh_pass=lilalaunebaer
+ansible_ssh_pass=IpwSjQMJos8y2iXw
 ansible_python_interpreter=/usr/bin/python2
-install_device=/dev/xvda
+install_device=/dev/vda
 
 [chroot:vars]
-ansible_host=10.137.2.16
+#ansible_host=10.137.2.16
+ansible_host=37.120.169.128
 ansible_port=2222
 ansible_ssh_user=root
-ansible_ssh_pass=foobar2342
+#ansible_ssh_pass=lilalaunebaer
+ansible_ssh_pass=IpwSjQMJos8y2iXw
 ansible_python_interpreter=/usr/bin/python2
 ssh_boot_key=~/.ssh/id_rsa.nosuchlink_boot.pub
 ssh_root_key=~/.ssh/id_ed25519.nosuchlink.pub
-nameserver=10.137.2.1
+#nameserver=10.137.2.1
+nameserver=8.8.8.8

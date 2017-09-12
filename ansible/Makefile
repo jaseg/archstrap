@@ -10,4 +10,7 @@ chroot:
 	env ANSIBLE_FORCE_COLOR=true ansible-playbook -l nosuchlink-setup-chroot ${ARGS} -i hosts main.yml 2>&1 | /home/user/lolcat/lolcat
 
 ssh:
-	sshpass -p$(shell grep ansible_ssh_pass hosts|cut -d= -f2|tail -n1) ssh -o Port=2222 -o User=root 10.137.2.16
+	sshpass -p$(shell grep ansible_ssh_pass hosts|cut -d= -f2|tail -n1) ssh -o Port=2222 -o User=root 37.120.169.128
+
+outerssh:
+	sshpass -p$(shell grep ansible_ssh_pass hosts|cut -d= -f2|tail -n1) ssh -o User=root 37.120.169.128 || true

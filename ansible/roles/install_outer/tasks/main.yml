@@ -39,42 +39,24 @@
     state: present
     part_start: 1GiB
     part_end: 100%
-  register: result
 
 - set_fact:
     bootdev: '{{install_device}}1'
     rootdev: '{{install_device}}2'
 
-- name: Try to open encrypted root volume
-  shell: 'echo -n foobar2342 | cryptsetup --key-file - luksOpen {{rootdev}} root'
-  args:
-    creates: /dev/mapper/root
-  register: cryptresult
-
 - name: Setup encrypted root volume
   shell: 'echo -n foobar2342 | cryptsetup --key-file - luksFormat {{rootdev}}'
-  when: result|succeeded and cryptresult|failed
 
 - name: Open encrypted root volume
   shell: 'echo -n foobar2342 | cryptsetup --key-file - luksOpen {{rootdev}} root'
   args:
     creates: /dev/mapper/root
-  when: cryptresult|succeeded
-
-- name: Mount root file system (late)
-  mount:
-    src: /dev/mapper/root
-    path: /mnt
-    state: mounted
-    fstype: ext4
-  register: rootmount
 
 - name: Create root file system
   filesystem:
     dev: /dev/mapper/root
     force: yes
     fstype: ext4
-  when: rootmount|failed
 
 - name: Mount root file system (late)
   mount:
@@ -82,15 +64,6 @@
     path: /mnt
     state: mounted
     fstype: ext4
-  when: rootmount|failed
-
-- name: Mount boot file system
-  mount:
-    src: '{{bootdev}}'
-    path: /mnt/boot
-    state: mounted
-    fstype: ext4
-  register: bootmount
 
 - name: Create boot file system
   filesystem:
@@ -98,7 +71,6 @@
     force: yes
     fstype: ext4
     opts: '-O ^64bit'
-  when: bootmount|failed
 
 - name: Mount boot file system (late)
   mount:
@@ -106,13 +78,11 @@
     path: /mnt/boot
     state: mounted
     fstype: ext4
-  when: bootmount|failed
 
 - name: Run pacstrap
   command: 'pacstrap /mnt base'
   args:
     creates: /mnt/etc/os-release
-#  register: result
 
 - name: Install packages
   command: 'pacman -r /mnt -S --needed --noconfirm python2 openssh vim tmux fish htop'
@@ -172,9 +142,4 @@
     opts: mode=1777,strictatime,nodev,nosuid
     state: mounted
     src: tmpfs
-
-# Not neccessary, already done by pacstrap
-# - name: Generate fstab
-#   shell: 'genfstab -U /mnt >> /mnt/etc/fstab'
-#   when: result|succeeded
 
